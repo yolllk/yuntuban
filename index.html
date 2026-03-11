@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云图盘 · A股全景热力图 v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg0:#04090f; --bg1:#070e18; --bg2:#0a1628; --bg3:#0d1e35; --bg4:#112340;
+  --border:rgba(80,160,255,0.1); --border2:rgba(80,160,255,0.2);
+  --accent:#3b9eff; --accent-glow:rgba(59,158,255,0.2);
+  --ai:#a855f7; --ai-glow:rgba(168,85,247,0.2);
+  --text0:#f0f8ff; --text1:#a8c8e8; --text2:#5a88aa; --text3:#2a4860;
+  --up:#ff5050; --dn:#00cc80; --flat:#1e3848;
+  --panel-w:430px; --hdr-h:58px; --bar-h:40px; --stats-h:32px; --dan-h:36px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg0);color:var(--text0);font-family:'Noto Sans SC',sans-serif;height:100vh;overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(59,158,255,0.022) 1px,transparent 1px),linear-gradient(90deg,rgba(59,158,255,0.022) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0;}
+
+/* ── HEADER ── */
+header{position:relative;z-index:50;height:var(--hdr-h);background:rgba(4,9,15,0.97);border-bottom:1px solid var(--border);backdrop-filter:blur(24px);display:flex;align-items:center;padding:0 18px;gap:16px;}
+.logo{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.logo-mark{width:34px;height:34px;background:linear-gradient(135deg,#1a6eff,#00d4ff);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 0 22px rgba(0,180,255,0.4);}
+.logo-text{font-size:18px;font-weight:700;letter-spacing:3px;background:linear-gradient(90deg,#fff 40%,#3b9eff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.logo-tag{font-size:9px;color:var(--text2);letter-spacing:1.5px;margin-top:-3px;}
+
+/* AI morning report button */
+.ai-report-btn{display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(59,158,255,0.1));border:1px solid rgba(168,85,247,0.4);border-radius:8px;padding:7px 13px;cursor:pointer;font-size:12px;color:#c084fc;font-family:'Noto Sans SC',sans-serif;transition:all .2s;flex-shrink:0;}
+.ai-report-btn:hover{background:linear-gradient(135deg,rgba(168,85,247,0.28),rgba(59,158,255,0.15));box-shadow:0 0 16px rgba(168,85,247,0.2);}
+.ai-pulse{width:7px;height:7px;border-radius:50%;background:#a855f7;animation:aipulse 2s infinite;}
+@keyframes aipulse{0%,100%{box-shadow:0 0 0 0 rgba(168,85,247,0.6);}50%{box-shadow:0 0 0 5px rgba(168,85,247,0);}}
+
+.search-wrap{flex:1;max-width:300px;position:relative;}
+.search-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:7px 34px 7px 13px;color:var(--text0);font-size:12px;font-family:'Noto Sans SC',sans-serif;outline:none;transition:all .2s;}
+.search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+.search-input::placeholder{color:var(--text3);}
+.search-ico{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;pointer-events:none;}
+.search-drop{position:absolute;top:calc(100% + 5px);left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;overflow:hidden;z-index:300;box-shadow:0 16px 48px rgba(0,0,0,.8);display:none;}
+.search-drop.show{display:block;}
+.sdrop-item{display:flex;align-items:center;gap:10px;padding:9px 13px;cursor:pointer;transition:background .12s;}
+.sdrop-item:hover{background:rgba(59,158,255,0.1);}
+.sd-code{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);width:52px;}
+.sd-name{font-size:12px;}
+.sd-chg{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;}
+
+.indices{display:flex;gap:2px;flex-shrink:0;}
+.idx{padding:5px 11px;border-radius:6px;cursor:pointer;transition:background .2s;text-align:center;}
+.idx:hover{background:rgba(59,158,255,0.08);}
+.idx-name{font-size:10px;color:var(--text2);letter-spacing:.5px;}
+.idx-val{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;line-height:1.3;}
+.idx-chg{font-family:'JetBrains Mono',monospace;font-size:10px;}
+.r{color:#ff5555;} .g{color:#00cc80;}
+
+.hdr-right{display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.live{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dn);letter-spacing:1px;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--dn);animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+.clock{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text1);}
+
+/* ── TOOLBAR ── */
+.toolbar{position:relative;z-index:40;height:var(--bar-h);background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:4px;overflow-x:auto;}
+.toolbar::-webkit-scrollbar{display:none;}
+.tb-sep{width:1px;height:18px;background:var(--border);margin:0 6px;flex-shrink:0;}
+.tb-lbl{font-size:10px;color:var(--text3);letter-spacing:1px;flex-shrink:0;}
+.tbtn{background:none;border:1px solid transparent;color:var(--text1);padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-family:'Noto Sans SC',sans-serif;transition:all .15s;white-space:nowrap;flex-shrink:0;}
+.tbtn:hover{border-color:var(--border2);color:var(--text0);}
+.tbtn.on{background:rgba(59,158,255,0.13);border-color:rgba(59,158,255,.45);color:var(--accent);}
+
+/* ── STATS ── */
+.statsbar{position:relative;z-index:40;height:var(--stats-h);background:var(--bg0);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:0;}
+.sb-item{display:flex;align-items:center;gap:5px;padding:0 14px;border-right:1px solid var(--border);height:100%;}
+.sb-item:first-child{padding-left:0;}
+.sb-item:last-child{border-right:none;flex:1;}
+.sb-lbl{font-size:10px;color:var(--text3);}
+.sb-v{font-family:'JetBrains Mono',monospace;font-size:12px;}
+.adv-bar{height:3px;border-radius:2px;background:var(--bg3);display:flex;overflow:hidden;flex:1;max-width:160px;}
+.adv-r{background:var(--up);border-radius:2px 0 0 2px;}
+.adv-f{background:var(--flat);}
+.adv-g{background:var(--dn);border-radius:0 2px 2px 0;}
+
+/* ── DANMAKU BAR ── */
+.danmaku-bar{position:relative;z-index:40;height:var(--dan-h);background:rgba(4,9,15,0.95);border-bottom:1px solid var(--border);display:flex;align-items:center;overflow:hidden;}
+.dan-label{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:0 14px;border-right:1px solid var(--border);height:100%;font-size:11px;color:var(--text2);}
+.dan-icon{font-size:14px;}
+.dan-track{flex:1;overflow:hidden;position:relative;height:100%;}
+.danmaku-container{position:absolute;inset:0;overflow:hidden;}
+.dan-item{position:absolute;white-space:nowrap;font-size:12px;padding:3px 10px;border-radius:12px;display:flex;align-items:center;gap:6px;top:50%;transform:translateY(-50%);animation:danScroll linear forwards;}
+@keyframes danScroll{from{transform:translateX(0) translateY(-50%);}to{transform:translateX(calc(-100% - 100vw)) translateY(-50%);}}
+.dan-badge{font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600;}
+.dan-input-wrap{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:0 12px;border-left:1px solid var(--border);}
+.dan-input{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;color:var(--text0);font-size:11px;font-family:'Noto Sans SC',sans-serif;outline:none;width:160px;}
+.dan-input::placeholder{color:var(--text3);}
+.dan-send{background:rgba(59,158,255,0.15);border:1px solid rgba(59,158,255,.35);color:var(--accent);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11px;font-family:'Noto Sans SC',sans-serif;transition:all .15s;}
+.dan-send:hover{background:rgba(59,158,255,0.28);}
+.dan-mood{display:flex;gap:3px;}
+.mood-btn{background:none;border:1px solid var(--border);border-radius:5px;padding:4px 7px;cursor:pointer;font-size:11px;transition:all .15s;}
+.mood-btn:hover{border-color:var(--border2);}
+.mood-btn.sel{border-color:currentColor;background:rgba(255,255,255,0.06);}
+
+/* ── LAYOUT ── */
+.layout{position:relative;z-index:1;display:flex;height:calc(100vh - var(--hdr-h) - var(--bar-h) - var(--stats-h) - var(--dan-h));}
+
+/* ── HEATMAP ── */
+.heatmap-area{flex:1;padding:10px;display:flex;flex-direction:column;gap:3px;min-width:0;transition:margin-right .35s cubic-bezier(.4,0,.2,1);}
+.heatmap-area.panel-open{margin-right:var(--panel-w);}
+.hrow{display:flex;gap:3px;flex:1;min-height:0;}
+.blk{position:relative;border-radius:7px;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s;display:flex;flex-direction:column;justify-content:space-between;padding:7px 9px 6px;min-width:0;}
+.blk::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,0);transition:background .15s;border-radius:7px;}
+.blk:hover::after{background:rgba(255,255,255,0.07);}
+.blk:hover{transform:scale(1.025);z-index:10;box-shadow:0 10px 40px rgba(0,0,0,.7),0 0 0 1.5px rgba(255,255,255,.18);}
+.rr{background:linear-gradient(140deg,#a80000,#cc0000);}
+.r2{background:linear-gradient(140deg,#c82020,#e03030);}
+.r1{background:linear-gradient(140deg,#e03030,#ff4444);}
+.r0{background:linear-gradient(140deg,#ff5050,#ff7070);}
+.rp{background:linear-gradient(140deg,#ff8888,#ffaaaa);}
+.fl{background:linear-gradient(140deg,#162a3a,#1e3848);}
+.gp{background:linear-gradient(140deg,#88ddbb,#aaeedd);}
+.g0{background:linear-gradient(140deg,#44bb88,#66ddaa);}
+.g1{background:linear-gradient(140deg,#00bb77,#22dd99);}
+.g2{background:linear-gradient(140deg,#009960,#00bb77);}
+.gg{background:linear-gradient(140deg,#006640,#009960);}
+.bname{font-size:11px;font-weight:500;color:rgba(255,255,255,.92);text-shadow:0 1px 4px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bchg{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;color:#fff;text-shadow:0 1px 5px rgba(0,0,0,.7);}
+.binner{display:flex;flex-wrap:wrap;gap:2px;margin-top:4px;flex:1;align-content:flex-start;}
+.bstock{background:rgba(0,0,0,.22);border-radius:3px;padding:2px 5px;display:flex;flex-direction:column;align-items:center;min-width:44px;}
+.bsn{font-size:9px;color:rgba(255,255,255,.88);}
+.bsc{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#fff;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.blk{animation:fadeUp .4s ease both;}
+
+/* legend */
+.legend{position:absolute;bottom:14px;left:14px;display:flex;align-items:center;gap:5px;background:rgba(4,9,15,.88);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:10px;color:var(--text2);z-index:20;pointer-events:none;}
+.lbar{display:flex;gap:2px;}
+.lc{width:14px;height:9px;border-radius:2px;}
+
+/* ── PANEL ── */
+.panel{position:fixed;top:calc(var(--hdr-h) + var(--bar-h) + var(--stats-h) + var(--dan-h));right:0;bottom:0;width:var(--panel-w);background:var(--bg1);border-left:1px solid var(--border2);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);z-index:80;box-shadow:-12px 0 40px rgba(0,0,0,.5);}
+.panel.open{transform:translateX(0);}
+.panel-hdr{padding:14px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0;}
+.ptag{font-size:10px;color:var(--text2);letter-spacing:1.5px;margin-bottom:3px;}
+.ptitle{font-size:19px;font-weight:700;letter-spacing:1px;}
+.pchg{font-family:'JetBrains Mono',monospace;font-size:21px;font-weight:600;margin-top:1px;}
+.pclose{background:none;border:none;color:var(--text2);font-size:19px;cursor:pointer;padding:2px 5px;border-radius:5px;transition:all .15s;line-height:1;}
+.pclose:hover{background:rgba(255,80,80,.12);color:#ff5555;}
+.pmeta{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.pm-item{flex:1;padding:9px 12px;text-align:center;border-right:1px solid var(--border);}
+.pm-item:last-child{border-right:none;}
+.pm-lbl{font-size:10px;color:var(--text2);margin-bottom:2px;}
+.pm-v{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;}
+
+/* mini chart */
+.panel-chart{height:110px;flex-shrink:0;padding:10px 14px 6px;border-bottom:1px solid var(--border);position:relative;overflow:hidden;}
+.chart-lbl{font-size:10px;color:var(--text2);letter-spacing:1px;margin-bottom:6px;}
+
+/* AI section in panel */
+.ai-section{flex-shrink:0;border-bottom:1px solid var(--border);padding:12px 16px;}
+.ai-sec-hdr{display:flex;align-items:center;gap:7px;margin-bottom:8px;}
+.ai-sec-icon{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,#a855f7,#3b9eff);display:flex;align-items:center;justify-content:center;font-size:10px;}
+.ai-sec-title{font-size:11px;font-weight:600;color:#c084fc;letter-spacing:1px;}
+.ai-sec-badge{font-size:9px;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,.3);color:#c084fc;border-radius:4px;padding:1px 6px;margin-left:auto;}
+.ai-text{font-size:12px;color:var(--text1);line-height:1.7;position:relative;}
+.ai-text.loading::after{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ai);animation:aiload .8s infinite alternate;margin-left:4px;vertical-align:middle;}
+@keyframes aiload{from{opacity:.2;transform:scale(.6);}to{opacity:1;transform:scale(1);}}
+.ai-cursor{display:inline-block;width:2px;height:13px;background:#a855f7;animation:blink 0.7s infinite;vertical-align:middle;margin-left:1px;}
+
+.ai-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;}
+.ai-tag{font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid;}
+
+/* stock list */
+.panel-list{flex:1;overflow-y:auto;padding:8px 10px;}
+.panel-list::-webkit-scrollbar{width:3px;}
+.panel-list::-webkit-scrollbar-thumb{background:var(--text3);border-radius:2px;}
+.pl-title{font-size:10px;color:var(--text3);letter-spacing:2px;padding:5px 4px;margin-bottom:1px;}
+.srow{display:flex;align-items:center;padding:7px 7px;border-radius:6px;cursor:pointer;transition:background .15s;gap:7px;}
+.srow:hover{background:rgba(59,158,255,0.07);}
+.srow-rank{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;width:14px;flex-shrink:0;}
+.srow-bar{width:3px;height:26px;border-radius:2px;flex-shrink:0;}
+.srow-info{flex:1;min-width:0;}
+.srow-name{font-size:12px;color:var(--text0);}
+.srow-code{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;}
+.srow-right{text-align:right;flex-shrink:0;}
+.srow-chg{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;}
+.srow-price{font-size:10px;color:var(--text1);font-family:'JetBrains Mono',monospace;}
+.panel-footer{padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.pf-tip{font-size:10px;color:var(--text3);}
+.ext-links{display:flex;gap:5px;}
+.xbtn{display:flex;align-items:center;gap:3px;background:rgba(59,158,255,0.1);border:1px solid rgba(59,158,255,.28);color:var(--accent);border-radius:5px;font-size:10px;padding:4px 9px;cursor:pointer;font-family:'Noto Sans SC',sans-serif;transition:all .15s;}
+.xbtn:hover{background:rgba(59,158,255,0.2);}
+
+/* ── AI MORNING REPORT MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+.modal-overlay.show{opacity:1;pointer-events:all;}
+.modal{background:var(--bg1);border:1px solid rgba(168,85,247,0.35);border-radius:16px;width:620px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.8),0 0 0 1px rgba(168,85,247,0.1);transform:translateY(20px);transition:transform .3s;}
+.modal-overlay.show .modal{transform:translateY(0);}
+.modal-hdr{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.modal-hdr-left{display:flex;align-items:center;gap:10px;}
+.modal-ai-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#a855f7,#3b9eff);display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 20px rgba(168,85,247,0.35);}
+.modal-title{font-size:17px;font-weight:700;background:linear-gradient(90deg,#e0c0ff,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.modal-sub{font-size:11px;color:var(--text2);margin-top:1px;}
+.modal-close{background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;padding:2px 6px;border-radius:5px;transition:all .15s;}
+.modal-close:hover{background:rgba(255,80,80,.12);color:#ff5555;}
+.modal-body{padding:20px 24px;overflow-y:auto;flex:1;}
+.modal-body::-webkit-scrollbar{width:4px;}
+.modal-body::-webkit-scrollbar-thumb{background:var(--text3);border-radius:2px;}
+.modal-section{margin-bottom:20px;}
+.modal-sec-title{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#c084fc;letter-spacing:1.5px;margin-bottom:10px;}
+.modal-sec-line{flex:1;height:1px;background:linear-gradient(90deg,rgba(168,85,247,0.3),transparent);}
+.modal-text{font-size:13px;color:var(--text1);line-height:1.85;}
+.modal-highlights{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.mh-item{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.mh-sector{font-size:10px;color:var(--text2);margin-bottom:3px;}
+.mh-chg{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;}
+.mh-reason{font-size:11px;color:var(--text1);margin-top:3px;line-height:1.5;}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.mf-tip{font-size:11px;color:var(--text3);}
+.mf-disclaimer{font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px;}
+
+/* ── TOOLTIP ── */
+.tt{position:fixed;pointer-events:none;background:rgba(4,9,15,.97);border:1px solid var(--border2);border-radius:10px;padding:11px 15px;min-width:185px;z-index:999;display:none;box-shadow:0 12px 48px rgba(0,0,0,.85);backdrop-filter:blur(20px);}
+.tt.show{display:block;}
+.tt-title{font-size:13px;font-weight:600;margin-bottom:7px;}
+.tt-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+.tt-lbl{font-size:10px;color:var(--text2);}
+.tt-v{font-family:'JetBrains Mono',monospace;font-size:11px;}
+.tt-div{height:1px;background:var(--border);margin:5px 0;}
+.tt-hint{font-size:10px;color:var(--text3);text-align:center;margin-top:3px;}
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">📊</div>
+    <div><div class="logo-text">云图盘</div><div class="logo-tag">A股全景热力图</div></div>
+  </div>
+
+  <button class="ai-report-btn" onclick="openMorningReport()">
+    <div class="ai-pulse"></div>
+    🤖 AI 今日大盘早报
+  </button>
+
+  <div class="search-wrap">
+    <input class="search-input" id="searchInput" placeholder="搜索股票 / 板块…" autocomplete="off">
+    <span class="search-ico">🔍</span>
+    <div class="search-drop" id="searchDrop">
+      <div class="sdrop-item" onclick="triggerPanel('新能源','宁德时代')"><span class="sd-code">300750</span><span class="sd-name">宁德时代</span><span class="sd-chg r">+5.77%</span></div>
+      <div class="sdrop-item" onclick="triggerPanel('银行','招商银行')"><span class="sd-code">600036</span><span class="sd-name">招商银行</span><span class="sd-chg r">+0.38%</span></div>
+      <div class="sdrop-item" onclick="triggerPanel('军工','中航沈飞')"><span class="sd-code">600760</span><span class="sd-name">中航沈飞</span><span class="sd-chg r">+9.80%</span></div>
+    </div>
+  </div>
+
+  <div class="indices">
+    <div class="idx"><div class="idx-name">上证</div><div class="idx-val r">4,124.35</div><div class="idx-chg r">▲0.03%</div></div>
+    <div class="idx"><div class="idx-name">深证</div><div class="idx-val r">14,488.25</div><div class="idx-chg r">▲0.80%</div></div>
+    <div class="idx"><div class="idx-name">创业板</div><div class="idx-val r">3,363.08</div><div class="idx-chg r">▲1.72%</div></div>
+    <div class="idx"><div class="idx-name">科创50</div><div class="idx-val g">1,413.54</div><div class="idx-chg g">▼0.49%</div></div>
+    <div class="idx"><div class="idx-name">沪深300</div><div class="idx-val r">4,690.84</div><div class="idx-chg r">▲0.53%</div></div>
+  </div>
+
+  <div class="hdr-right">
+    <div class="live"><div class="live-dot"></div>实时行情</div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<!-- ══ TOOLBAR ══ -->
+<div class="toolbar">
+  <span class="tb-lbl">板块</span>
+  <button class="tbtn on">A股全图</button><button class="tbtn">沪市</button><button class="tbtn">深市</button><button class="tbtn">沪深300</button><button class="tbtn">创业板</button><button class="tbtn">科创板</button>
+  <div class="tb-sep"></div>
+  <span class="tb-lbl">指标</span>
+  <button class="tbtn on">涨跌幅</button><button class="tbtn">资金流向</button><button class="tbtn">换手率</button><button class="tbtn">市盈率</button>
+  <div class="tb-sep"></div>
+  <span class="tb-lbl">面积</span>
+  <button class="tbtn on">流通市值</button><button class="tbtn">成交量</button><button class="tbtn">等权</button>
+  <div class="tb-sep"></div>
+  <span class="tb-lbl">复盘</span>
+  <button class="tbtn">09:30</button><button class="tbtn">10:00</button><button class="tbtn">11:00</button><button class="tbtn">13:30</button><button class="tbtn">15:00</button>
+</div>
+
+<!-- ══ STATS ══ -->
+<div class="statsbar">
+  <div class="sb-item"><span class="sb-lbl">上涨</span><span class="sb-v r">2,934</span></div>
+  <div class="sb-item"><span class="sb-lbl">平盘</span><span class="sb-v" style="color:var(--text1)">287</span></div>
+  <div class="sb-item"><span class="sb-lbl">下跌</span><span class="sb-v g">1,142</span></div>
+  <div class="sb-item"><span class="sb-lbl">涨停</span><span class="sb-v" style="color:#ff2020">94</span></div>
+  <div class="sb-item"><span class="sb-lbl">跌停</span><span class="sb-v" style="color:#00ee88">11</span></div>
+  <div class="sb-item" style="flex:1;gap:10px;">
+    <span class="sb-lbl">涨跌比</span>
+    <div class="adv-bar"><div class="adv-r" style="width:66%"></div><div class="adv-f" style="width:6%"></div><div class="adv-g" style="width:28%"></div></div>
+    <span class="sb-v" style="font-size:10px;color:var(--text1)">66%上涨</span>
+  </div>
+  <div class="sb-item"><span class="sb-lbl">成交额</span><span class="sb-v" style="color:#3b9eff">1.08万亿</span></div>
+  <div class="sb-item"><span class="sb-lbl">北向资金</span><span class="sb-v r">+42.3亿</span></div>
+</div>
+
+<!-- ══ DANMAKU BAR ══ -->
+<div class="danmaku-bar">
+  <div class="dan-label"><span class="dan-icon">💬</span>股友弹幕</div>
+  <div class="dan-track">
+    <div class="danmaku-container" id="danContainer"></div>
+  </div>
+  <div class="dan-input-wrap">
+    <div class="dan-mood">
+      <button class="mood-btn" style="color:#ff5555" id="moodUp" onclick="selectMood('up',this)">🔴 看涨</button>
+      <button class="mood-btn sel" style="color:#aaa" id="moodWatch" onclick="selectMood('watch',this)">⚪ 观望</button>
+      <button class="mood-btn" style="color:#00cc80" id="moodDn" onclick="selectMood('dn',this)">🟢 看跌</button>
+    </div>
+    <input class="dan-input" id="danInput" placeholder="发弹幕，分享你的看法…" maxlength="30">
+    <button class="dan-send" onclick="sendDanmaku()">发送</button>
+  </div>
+</div>
+
+<!-- ══ LAYOUT ══ -->
+<div class="layout">
+  <div class="heatmap-area" id="heatmap">
+    <!-- Row 1 -->
+    <div class="hrow">
+      <div class="blk r1" style="flex:3.2;animation-delay:.02s" data-sector="银行" data-chg="+0.57" data-vol="1,243亿" data-ud="36/4" data-top="招商银行+0.38%">
+        <div><div class="bname">银行</div><div class="bchg">+0.57%</div></div>
+        <div class="binner">
+          <div class="bstock"><div class="bsn">工商银行</div><div class="bsc">+0.57%</div></div>
+          <div class="bstock"><div class="bsn">农业银行</div><div class="bsc">+0.61%</div></div>
+          <div class="bstock"><div class="bsn">招商银行</div><div class="bsc">+0.38%</div></div>
+          <div class="bstock"><div class="bsn">建设银行</div><div class="bsc">+0.67%</div></div>
+          <div class="bstock"><div class="bsn">中国银行</div><div class="bsc">+0.19%</div></div>
+        </div>
+      </div>
+      <div class="blk r0" style="flex:2.0;animation-delay:.04s" data-sector="非银金融" data-chg="+0.85" data-vol="445亿" data-ud="28/12" data-top="中信证券+1.2%">
+        <div><div class="bname">非银金融</div><div class="bchg">+0.85%</div></div>
+        <div class="binner">
+          <div class="bstock"><div class="bsn">中信证券</div><div class="bsc">+1.20%</div></div>
+          <div class="bstock"><div class="bsn">东方财富</div><div class="bsc">+0.42%</div></div>
+        </div>
+      </div>
+      <div class="blk rp" style="flex:1.2;animation-delay:.06s" data-sector="汽车" data-chg="+0.22" data-vol="312亿" data-ud="22/18" data-top="比亚迪+0.8%">
+        <div><div class="bname">汽车</div><div class="bchg">+0.22%</div></div>
+      </div>
+      <div class="blk g1" style="flex:1.1;animation-delay:.08s" data-sector="医药生物" data-chg="-1.26" data-vol="388亿" data-ud="18/64" data-top="恒瑞医药-1.26%">
+        <div><div class="bname">医药生物</div><div class="bchg">-1.26%</div></div>
+      </div>
+      <div class="blk rp" style="flex:0.85;animation-delay:.10s" data-sector="食品饮料" data-chg="+0.18" data-vol="280亿" data-ud="20/16" data-top="贵州茅台+0.5%">
+        <div><div class="bname">食品饮料</div><div class="bchg">+0.18%</div></div>
+      </div>
+      <div class="blk g2" style="flex:0.75;animation-delay:.12s" data-sector="房地产" data-chg="-0.95" data-vol="198亿" data-ud="12/48" data-top="万科A-2.0%">
+        <div><div class="bname">房地产</div><div class="bchg">-0.95%</div></div>
+      </div>
+    </div>
+    <!-- Row 2 -->
+    <div class="hrow">
+      <div class="blk r2" style="flex:2.4;animation-delay:.06s" data-sector="电子" data-chg="+1.82" data-vol="812亿" data-ud="48/14" data-top="工业富联+2.41%">
+        <div><div class="bname">电子</div><div class="bchg">+1.82%</div></div>
+        <div class="binner">
+          <div class="bstock"><div class="bsn">工业富联</div><div class="bsc">+2.41%</div></div>
+          <div class="bstock"><div class="bsn">中芯国际</div><div class="bsc">+0.56%</div></div>
+          <div class="bstock"><div class="bsn">寒武纪</div><div class="bsc">+2.41%</div></div>
+          <div class="bstock"><div class="bsn">北方华创</div><div class="bsc">-0.43%</div></div>
+        </div>
+      </div>
+      <div class="blk rr" style="flex:2.6;animation-delay:.08s" data-sector="新能源" data-chg="+5.77" data-vol="945亿" data-ud="58/8" data-top="宁德时代+5.77%">
+        <div><div class="bname">电力设备·新能源</div><div class="bchg">+5.77%</div></div>
+        <div class="binner">
+          <div class="bstock"><div class="bsn">宁德时代</div><div class="bsc">+5.77%</div></div>
+          <div class="bstock"><div class="bsn">阳光电源</div><div class="bsc">+10.1%</div></div>
+          <div class="bstock"><div class="bsn">亿纬锂能</div><div class="bsc">+3.2%</div></div>
+          <div class="bstock"><div class="bsn">比亚迪</div><div class="bsc">+2.8%</div></div>
+        </div>
+      </div>
+      <div class="blk g0" style="flex:1.5;animation-delay:.10s" data-sector="医药生物" data-chg="-2.00" data-vol="388亿" data-ud="18/64" data-top="药明康德-2.0%">
+        <div><div class="bname">医药生物</div><div class="bchg">-2.00%</div></div>
+        <div class="binner">
+          <div class="bstock"><div class="bsn">药明康德</div><div class="bsc">-2.00%</div></div>
+          <div class="bstock"><div class="bsn">恒瑞医药</div><div class="bsc">-1.26%</div></div>
+        </div>
+      </div>
+      <div class="blk r1" style="flex:1.3;animation-delay:.12s" data-sector="通信" data-chg="+1.17" data-vol="276亿" data-ud="32/10" data-top="中国移动+1.17%">
+        <div><div class="bname">通信</div><div class="bchg">+1.17%</div></div>
+        <div class="binner">
+          <div class="bstock"><div class="bsn">中国移动</div><div class="bsc">+1.17%</div></div>
+          <div class="bstock"><div class="bsn">中际旭创</div><div class="bsc">+2.06%</div></div>
+        </div>
+      </div>
+      <div class="blk fl" style="flex:0.7;animation-delay:.14s" data-sector="钢铁" data-chg="-0.12" data-vol="145亿" data-ud="14/22" data-top="宝钢股份-0.5%">
+        <div><div class="bname">钢铁</div><div class="bchg">-0.12%</div></div>
+      </div>
+    </div>
+    <!-- Row 3 -->
+    <div class="hrow">
+      <div class="blk rp" style="flex:1.1;animation-delay:.10s" data-sector="化工" data-chg="+0.35" data-vol="234亿" data-ud="40/30" data-top="万华化学+1.0%"><div><div class="bname">化工</div><div class="bchg">+0.35%</div></div></div>
+      <div class="blk g1" style="flex:1.0;animation-delay:.12s" data-sector="机械设备" data-chg="-0.55" data-vol="196亿" data-ud="22/38" data-top="三一重工-0.8%"><div><div class="bname">机械设备</div><div class="bchg">-0.55%</div></div></div>
+      <div class="blk rr" style="flex:1.4;animation-delay:.14s" data-sector="军工" data-chg="+3.20" data-vol="276亿" data-ud="42/4" data-top="中航沈飞+9.8%">
+        <div><div class="bname">军工</div><div class="bchg">+3.20%</div></div>
+        <div class="binner"><div class="bstock"><div class="bsn">中航沈飞</div><div class="bsc">+9.8%</div></div><div class="bstock"><div class="bsn">航发动力</div><div class="bsc">+5.2%</div></div></div>
+      </div>
+      <div class="blk r0" style="flex:1.0;animation-delay:.16s" data-sector="计算机" data-chg="+1.55" data-vol="287亿" data-ud="34/16" data-top="用友网络+3.8%"><div><div class="bname">计算机</div><div class="bchg">+1.55%</div></div></div>
+      <div class="blk r1" style="flex:0.9;animation-delay:.18s" data-sector="传媒" data-chg="+1.85" data-vol="178亿" data-ud="28/8" data-top="芒果超媒+4.2%"><div><div class="bname">传媒</div><div class="bchg">+1.85%</div></div></div>
+      <div class="blk rp" style="flex:0.75;animation-delay:.20s" data-sector="家用电器" data-chg="+0.98" data-vol="156亿" data-ud="18/12" data-top="格力电器+1.2%"><div><div class="bname">家用电器</div><div class="bchg">+0.98%</div></div></div>
+      <div class="blk g2" style="flex:0.75;animation-delay:.22s" data-sector="石油石化" data-chg="-0.92" data-vol="312亿" data-ud="8/28" data-top="中国石油-0.92%"><div><div class="bname">石油石化</div><div class="bchg">-0.92%</div></div></div>
+      <div class="blk rp" style="flex:0.65;animation-delay:.24s" data-sector="纺织服饰" data-chg="+0.44" data-vol="66亿" data-ud="14/10" data-top="——"><div><div class="bname">纺织服饰</div><div class="bchg">+0.44%</div></div></div>
+      <div class="blk g0" style="flex:0.65;animation-delay:.26s" data-sector="轻工制造" data-chg="-0.68" data-vol="58亿" data-ud="10/18" data-top="——"><div><div class="bname">轻工制造</div><div class="bchg">-0.68%</div></div></div>
+    </div>
+    <div class="legend">
+      <div class="lbar"><div class="lc" style="background:#a80000"></div><div class="lc" style="background:#c82020"></div><div class="lc" style="background:#e03030"></div><div class="lc" style="background:#ff7070"></div></div>
+      <span style="color:var(--up);margin:0 5px;">大涨</span>
+      <div class="lc" style="background:#1e3848;border-radius:2px"></div>
+      <span style="margin:0 5px;color:var(--text2)">平</span>
+      <div class="lbar"><div class="lc" style="background:#77ddbb"></div><div class="lc" style="background:#00bb77"></div><div class="lc" style="background:#009960"></div><div class="lc" style="background:#006640"></div></div>
+      <span style="color:var(--dn);margin-left:5px;">大跌</span>
+      <span style="margin-left:10px;color:var(--text3)">面积=市值 · 颜色=涨跌幅</span>
+    </div>
+  </div>
+
+  <!-- ══ DETAIL PANEL ══ -->
+  <div class="panel" id="panel">
+    <div class="panel-hdr">
+      <div>
+        <div class="ptag" id="ptag">板块详情</div>
+        <div class="ptitle" id="ptitle">—</div>
+        <div class="pchg" id="pchg">—</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px">
+        <button class="pclose" onclick="closePanel()">✕</button>
+        <button class="xbtn" onclick="openExternal()">↗ 雪球</button>
+      </div>
+    </div>
+    <div class="pmeta">
+      <div class="pm-item"><div class="pm-lbl">成交额</div><div class="pm-v" id="pvol">—</div></div>
+      <div class="pm-item"><div class="pm-lbl">上涨/下跌</div><div class="pm-v" id="pud">—</div></div>
+      <div class="pm-item"><div class="pm-lbl">领涨股</div><div class="pm-v" id="ptop" style="font-size:11px">—</div></div>
+    </div>
+    <div class="panel-chart">
+      <div class="chart-lbl">今日走势</div>
+      <canvas id="miniChart" height="80"></canvas>
+    </div>
+
+    <!-- AI 板块分析 -->
+    <div class="ai-section">
+      <div class="ai-sec-hdr">
+        <div class="ai-sec-icon">✨</div>
+        <span class="ai-sec-title">AI 板块解读</span>
+        <span class="ai-sec-badge">实时生成</span>
+      </div>
+      <div class="ai-text" id="aiSectorText">点击板块后 AI 自动分析…</div>
+      <div class="ai-tags" id="aiTags"></div>
+    </div>
+
+    <div class="panel-list" id="plist">
+      <div class="pl-title">成分股明细</div>
+    </div>
+    <div class="panel-footer">
+      <span class="pf-tip">点击股票 → 跳转雪球</span>
+      <div class="ext-links">
+        <button class="xbtn" onclick="alert('跳转东方财富…')">东方财富</button>
+        <button class="xbtn" onclick="alert('跳转同花顺…')">同花顺</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ AI MORNING REPORT MODAL ══ -->
+<div class="modal-overlay" id="modalOverlay" onclick="e=>e.target===this&&closeMorningReport()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-hdr">
+      <div class="modal-hdr-left">
+        <div class="modal-ai-icon">🤖</div>
+        <div>
+          <div class="modal-title">AI 今日大盘早报</div>
+          <div class="modal-sub" id="modalDate">2026-03-11 · 开盘分析</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeMorningReport()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-sec-title">📊 今日大盘概览 <div class="modal-sec-line"></div></div>
+        <div class="modal-text" id="modalOverview"></div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">🔥 今日热点板块 <div class="modal-sec-line"></div></div>
+        <div class="modal-highlights" id="modalHighlights"></div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">⚠️ 风险提示 <div class="modal-sec-line"></div></div>
+        <div class="modal-text" id="modalRisk"></div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">🎯 操作建议 <div class="modal-sec-line"></div></div>
+        <div class="modal-text" id="modalAdvice"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="mf-tip" id="modalGenTime"></span>
+      <span class="mf-disclaimer">⚠️ AI 分析仅供参考，不构成投资建议</span>
+    </div>
+  </div>
+</div>
+
+<!-- TOOLTIP -->
+<div class="tt" id="tt">
+  <div class="tt-title" id="ttTitle"></div>
+  <div class="tt-row"><span class="tt-lbl">涨跌幅</span><span class="tt-v" id="ttChg"></span></div>
+  <div class="tt-row"><span class="tt-lbl">成交额</span><span class="tt-v" id="ttVol"></span></div>
+  <div class="tt-row"><span class="tt-lbl">上涨/下跌</span><span class="tt-v" id="ttUD"></span></div>
+  <div class="tt-div"></div>
+  <div class="tt-row"><span class="tt-lbl">领涨股</span><span class="tt-v" id="ttTop"></span></div>
+  <div class="tt-hint">点击查看详情 →</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════
+const STOCKS = {
+  '银行':     [{n:'工商银行',c:'601398',p:'6.32',chg:'+0.57%'},{n:'农业银行',c:'601288',p:'4.88',chg:'+0.61%'},{n:'招商银行',c:'600036',p:'42.15',chg:'+0.38%'},{n:'建设银行',c:'601939',p:'8.22',chg:'+0.67%'},{n:'中国银行',c:'601988',p:'5.28',chg:'+0.19%'},{n:'交通银行',c:'601328',p:'7.80',chg:'+0.45%'},{n:'兴业银行',c:'601166',p:'20.34',chg:'+0.85%'}],
+  '新能源':   [{n:'宁德时代',c:'300750',p:'268.50',chg:'+5.77%'},{n:'阳光电源',c:'300274',p:'88.40',chg:'+10.10%'},{n:'亿纬锂能',c:'300014',p:'44.20',chg:'+3.20%'},{n:'比亚迪',c:'002594',p:'256.80',chg:'+2.80%'},{n:'天合光能',c:'688599',p:'14.50',chg:'+4.30%'},{n:'晶科能源',c:'688223',p:'8.82',chg:'+3.80%'}],
+  '电子':     [{n:'工业富联',c:'601138',p:'28.45',chg:'+2.41%'},{n:'中芯国际',c:'688981',p:'112.50',chg:'+0.56%'},{n:'北方华创',c:'002371',p:'312.00',chg:'-0.43%'},{n:'寒武纪',c:'688256',p:'392.00',chg:'+2.41%'},{n:'澜起科技',c:'688008',p:'48.60',chg:'+1.80%'},{n:'韦尔股份',c:'603501',p:'88.30',chg:'+3.20%'}],
+  '医药生物': [{n:'药明康德',c:'603259',p:'93.26',chg:'-0.95%'},{n:'恒瑞医药',c:'600276',p:'42.80',chg:'-1.26%'},{n:'百济神州',c:'688235',p:'182.50',chg:'-2.80%'},{n:'迈瑞医疗',c:'300760',p:'278.00',chg:'-1.10%'},{n:'爱尔眼科',c:'300015',p:'10.31',chg:'-0.29%'}],
+  '军工':     [{n:'中航沈飞',c:'600760',p:'75.32',chg:'+9.80%'},{n:'航发动力',c:'600893',p:'42.18',chg:'+5.20%'},{n:'中直股份',c:'600038',p:'38.50',chg:'+3.40%'},{n:'中航西飞',c:'000768',p:'28.60',chg:'+2.80%'}],
+  '通信':     [{n:'中国移动',c:'600941',p:'102.50',chg:'+1.17%'},{n:'中国电信',c:'601728',p:'6.84',chg:'+1.34%'},{n:'中际旭创',c:'300308',p:'118.40',chg:'+2.06%'},{n:'新易盛',c:'300502',p:'88.20',chg:'+1.21%'}],
+  '非银金融': [{n:'中信证券',c:'600030',p:'28.80',chg:'+1.20%'},{n:'东方财富',c:'300059',p:'22.45',chg:'+0.42%'},{n:'海通证券',c:'600837',p:'10.80',chg:'+0.35%'}],
+};
+
+const AI_SECTOR = {
+  '银行':   {text:'今日银行板块整体偏强，受益于近期央行维持流动性宽松预期，资金面较为充裕。国有大行成交活跃，机构资金有所流入。招商银行、兴业银行等股份制银行相对领涨，关注后续净息差数据。', tags:['资金流入','利率预期','业绩稳健']},
+  '新能源': {text:'新能源板块今日强势领涨全市场，宁德时代、阳光电源等龙头强势拉升。消息面：欧盟下调储能补贴政策预期反转，叠加国内电网招标放量，市场情绪高涨。量能显著放大，机构资金净流入超50亿。', tags:['政策催化','量能放大','机构买入','龙头带动']},
+  '电子':   {text:'电子板块受AI算力产业链持续升温带动，半导体设备、消费电子均有所表现。工业富联受益于AI服务器订单增长，寒武纪受芯片国产替代逻辑支撑。板块整体分化，建议关注业绩确定性较强标的。', tags:['AI算力','国产替代','业绩分化']},
+  '医药生物':{text:'医药板块今日承压，受CXO板块估值回调拖累，药明康德、百济神州跌幅居前。整体来看医药估值仍处于历史中位，短期情绪偏谨慎，但中长期逻辑未破坏，建议逢低关注创新药龙头。', tags:['估值承压','CXO调整','逢低关注']},
+  '军工':   {text:'军工板块今日强势涨停潮，中航沈飞涨停领衔，受益于国防预算预期上调消息刺激。板块整体量能大幅放大，游资情绪旺盛。但需注意近期军工板块波动较大，短线追高需谨慎。', tags:['国防预算','涨停效应','游资活跃','追高谨慎']},
+  '通信':   {text:'通信板块受算力网络建设加速预期推动，5G+AI基础设施投资逻辑持续演绎。中际旭创、新易盛等光模块标的表现活跃，中国移动稳健上涨。整体板块性价比尚可。', tags:['算力网络','光模块','5G建设']},
+  '非银金融':{text:'证券板块小幅反弹，受益于市场成交额持续维持高位。东方财富、中信证券成交量温和放大。当前板块估值处于历史偏低位置，若市场持续活跃，券商弹性较大，值得关注。', tags:['成交放量','低估值','弹性较大']},
+};
+
+// ══════════════════════════════════════════
+// DANMAKU
+// ══════════════════════════════════════════
+let selectedMood = 'watch';
+const PRESET = [
+  {text:'宁德时代加油！！！', mood:'up', color:'#ff5555'},
+  {text:'军工要起飞了？', mood:'up', color:'#ff5555'},
+  {text:'医药还能抄底吗', mood:'watch', color:'#aaa'},
+  {text:'大盘感觉还要涨', mood:'up', color:'#ff5555'},
+  {text:'北向资金今天流入不少', mood:'up', color:'#ff5555'},
+  {text:'房地产什么时候能好', mood:'watch', color:'#aaa'},
+  {text:'科技板块继续关注', mood:'up', color:'#ff5555'},
+  {text:'今天看跌，仓位减半', mood:'dn', color:'#00cc80'},
+  {text:'阳光电源涨停！！', mood:'up', color:'#ff5555'},
+  {text:'这波军工太猛了', mood:'up', color:'#ff5555'},
+  {text:'医药估值已经很低了', mood:'watch', color:'#aaa'},
+  {text:'继续持有不动', mood:'watch', color:'#aaa'},
+];
+let danIdx = 0;
+
+function createDan(text, mood, color) {
+  const el = document.createElement('div');
+  el.className = 'dan-item';
+  const moodLabel = mood==='up'?'看涨':mood==='dn'?'看跌':'观望';
+  const bgColor = mood==='up'?'rgba(255,85,85,0.12)':mood==='dn'?'rgba(0,204,128,0.12)':'rgba(100,120,140,0.12)';
+  const bdColor = mood==='up'?'rgba(255,85,85,0.3)':mood==='dn'?'rgba(0,204,128,0.3)':'rgba(100,120,140,0.2)';
+  el.style.cssText = `background:${bgColor};border:1px solid ${bdColor};left:100%;`;
+  el.innerHTML = `<span class="dan-badge" style="background:${bgColor};border:1px solid ${bdColor};color:${color}">${moodLabel}</span><span style="color:${color==='#aaa'?'var(--text1)':color}">${text}</span>`;
+  document.getElementById('danContainer').appendChild(el);
+  const duration = 12 + Math.random()*6;
+  el.style.animation = `danScroll ${duration}s linear forwards`;
+  el.style.left = '100%';
+  setTimeout(()=>el.remove(), duration*1000+200);
+}
+
+function selectMood(mood, btn) {
+  selectedMood = mood;
+  document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+function sendDanmaku() {
+  const inp = document.getElementById('danInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  const c = selectedMood==='up'?'#ff5555':selectedMood==='dn'?'#00cc80':'#aaa';
+  createDan(text, selectedMood, c);
+  inp.value = '';
+}
+document.getElementById('danInput').addEventListener('keydown', e=>{if(e.key==='Enter')sendDanmaku();});
+
+// auto danmaku
+function autodan() {
+  const d = PRESET[danIdx % PRESET.length]; danIdx++;
+  createDan(d.text, d.mood, d.color);
+  setTimeout(autodan, 2200 + Math.random()*1800);
+}
+setTimeout(autodan, 800);
+
+// ══════════════════════════════════════════
+// HEATMAP INTERACTION
+// ══════════════════════════════════════════
+const tt = document.getElementById('tt');
+document.querySelectorAll('.blk').forEach(blk=>{
+  blk.addEventListener('mousemove', e=>{
+    const s=blk.dataset, isUp=parseFloat(s.chg)>=0, c=isUp?'#ff5555':'#00cc80';
+    document.getElementById('ttTitle').textContent=s.sector;
+    document.getElementById('ttTitle').style.color=c;
+    document.getElementById('ttChg').textContent=s.chg+'%';
+    document.getElementById('ttChg').style.color=c;
+    document.getElementById('ttVol').textContent=s.vol;
+    document.getElementById('ttUD').textContent=s.ud+' 家';
+    document.getElementById('ttTop').textContent=s.top;
+    tt.style.left=(e.clientX+18)+'px';
+    tt.style.top=Math.min(e.clientY-10,window.innerHeight-170)+'px';
+    tt.classList.add('show');
+  });
+  blk.addEventListener('mouseleave',()=>tt.classList.remove('show'));
+  blk.addEventListener('click',()=>openPanel(blk.dataset));
+});
+
+function openPanel(data) {
+  const chg=parseFloat(data.chg), isUp=chg>=0, c=isUp?'#ff5555':'#00cc80';
+  document.getElementById('ptag').textContent='申万一级行业';
+  document.getElementById('ptitle').textContent=data.sector;
+  document.getElementById('pchg').textContent=data.chg+'%';
+  document.getElementById('pchg').style.color=c;
+  document.getElementById('pvol').textContent=data.vol;
+  document.getElementById('pud').textContent=data.ud+' 家';
+  document.getElementById('ptop').textContent=data.top;
+  buildStockList(data.sector);
+  drawMiniChart(isUp);
+  showAISector(data.sector, isUp);
+  document.getElementById('panel').classList.add('open');
+  document.getElementById('heatmap').classList.add('panel-open');
+}
+
+function triggerPanel(sector, stock) {
+  document.getElementById('searchDrop').classList.remove('show');
+  document.getElementById('searchInput').value='';
+  const blk = [...document.querySelectorAll('.blk')].find(b=>b.dataset.sector===sector);
+  if(blk) openPanel(blk.dataset);
+}
+
+function closePanel(){
+  document.getElementById('panel').classList.remove('open');
+  document.getElementById('heatmap').classList.remove('panel-open');
+}
+function openExternal(){window.open('https://xueqiu.com','_blank');}
+
+function buildStockList(sector) {
+  const stocks=STOCKS[sector]||[{n:'暂无数据',c:'——',p:'——',chg:'——'}];
+  const list=document.getElementById('plist');
+  list.innerHTML='<div class="pl-title">成分股明细</div>';
+  stocks.forEach((s,i)=>{
+    const isUp=!s.chg.startsWith('-'), c=isUp?'#ff5555':'#00cc80';
+    list.innerHTML+=`<div class="srow" onclick="window.open('https://xueqiu.com/S/${s.c}','_blank')">
+      <span class="srow-rank">${i+1}</span>
+      <div class="srow-bar" style="background:${c}"></div>
+      <div class="srow-info"><div class="srow-name">${s.n}</div><div class="srow-code">${s.c}</div></div>
+      <div class="srow-right"><div class="srow-chg" style="color:${c}">${s.chg}</div><div class="srow-price">¥ ${s.p}</div></div>
+    </div>`;
+  });
+}
+
+// ══════════════════════════════════════════
+// AI SECTOR ANALYSIS (typewriter effect)
+// ══════════════════════════════════════════
+let aiTypeTimer = null;
+function showAISector(sector, isUp) {
+  const data = AI_SECTOR[sector] || {text:`${sector}板块今日表现${isUp?'偏强':'偏弱'}，市场情绪${isUp?'积极':'谨慎'}，建议持续关注板块资金动向及政策面变化。`, tags:['关注']};
+  const el = document.getElementById('aiSectorText');
+  const tagsEl = document.getElementById('aiTags');
+  el.innerHTML = '';
+  tagsEl.innerHTML = '';
+  if(aiTypeTimer) clearInterval(aiTypeTimer);
+  let i=0;
+  el.innerHTML = '<span class="ai-cursor"></span>';
+  aiTypeTimer = setInterval(()=>{
+    if(i>=data.text.length){
+      clearInterval(aiTypeTimer);
+      el.innerHTML = data.text;
+      data.tags.forEach(tag=>{
+        const c = isUp?'rgba(255,85,85,':'rgba(0,204,128,';
+        const bc = isUp?'rgba(255,85,85,0.3)':'rgba(0,204,128,0.3)';
+        const tc = isUp?'#ff8888':'#66ddaa';
+        tagsEl.innerHTML+=`<span class="ai-tag" style="background:${c}0.1);border-color:${bc};color:${tc}">${tag}</span>`;
+      });
+      return;
+    }
+    el.innerHTML = data.text.slice(0,i) + '<span class="ai-cursor"></span>';
+    i++;
+  }, 22);
+}
+
+// ══════════════════════════════════════════
+// MINI CHART
+// ══════════════════════════════════════════
+function drawMiniChart(isUp) {
+  const canvas=document.getElementById('miniChart');
+  const ctx=canvas.getContext('2d');
+  canvas.width=canvas.offsetWidth*2; canvas.height=80*2; ctx.scale(2,2);
+  const W=canvas.width/2, H=80;
+  const pts=[]; let v=50+(Math.random()-.5)*8;
+  for(let i=0;i<80;i++){v+=(Math.random()-(isUp?.43:.57))*2.8;v=Math.max(8,Math.min(72,v));pts.push(v);}
+  const minV=Math.min(...pts),maxV=Math.max(...pts);
+  const ny=v=>H-6-((v-minV)/(maxV-minV+.01))*(H-12);
+  const xs=W/(pts.length-1);
+  const g=ctx.createLinearGradient(0,0,0,H);
+  if(isUp){g.addColorStop(0,'rgba(255,85,85,0.28)');g.addColorStop(1,'rgba(255,85,85,0.02)');}
+  else{g.addColorStop(0,'rgba(0,200,120,0.25)');g.addColorStop(1,'rgba(0,200,120,0.02)');}
+  ctx.beginPath(); pts.forEach((p,i)=>i===0?ctx.moveTo(0,ny(p)):ctx.lineTo(i*xs,ny(p)));
+  ctx.lineTo((pts.length-1)*xs,H);ctx.lineTo(0,H);ctx.closePath();ctx.fillStyle=g;ctx.fill();
+  ctx.beginPath(); pts.forEach((p,i)=>i===0?ctx.moveTo(0,ny(p)):ctx.lineTo(i*xs,ny(p)));
+  ctx.strokeStyle=isUp?'#ff5555':'#00cc80';ctx.lineWidth=1.5;ctx.stroke();
+  // noon line
+  ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);
+  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.stroke();ctx.setLineDash([]);
+}
+
+// ══════════════════════════════════════════
+// AI MORNING REPORT
+// ══════════════════════════════════════════
+const REPORT = {
+  overview:`今日A股市场呈现"科技+军工"双主线格局，市场整体偏强运行。截至目前沪深两市成交额已突破1万亿元，为近三个月新高，显示市场参与热情显著回升。\n\n上证指数在4120点附近获得支撑后反弹，创业板指涨幅领先，成长风格明显占优。北向资金净流入超40亿元，外资态度整体偏多，市场情绪较为乐观。`,
+  highlights:[
+    {sector:'⚡ 新能源', chg:'+5.77%', reason:'欧盟储能补贴政策预期反转，国内电网招标放量，资金加速流入', isUp:true},
+    {sector:'🛡️ 军工', chg:'+3.20%', reason:'国防预算预期上调，中航沈飞涨停领衔，板块量能大幅放大', isUp:true},
+    {sector:'💊 医药生物', chg:'-2.00%', reason:'CXO板块估值回调，药明康德受海外政策扰动拖累', isUp:false},
+    {sector:'🏠 房地产', chg:'-0.95%', reason:'政策效果尚待验证，市场对复苏预期仍较为保守', isUp:false},
+  ],
+  risk:`① 美联储利率政策仍存在不确定性，汇率波动可能对外资流入产生扰动\n② 军工、新能源板块涨幅较大，短期存在高位获利了结压力，追高需谨慎\n③ 医药板块受海外政策影响尚未出清，回避相关标的短期风险`,
+  advice:`✅ 可关注：新能源产业链龙头（宁德时代、阳光电源）、AI算力方向（寒武纪、工业富联）、低估值央企蓝筹（银行、通信）\n\n⚠️ 谨慎：短期涨幅较大的军工标的，高位追涨风险较大\n\n💡 策略：当前市场成交活跃，情绪偏暖，可适当提高仓位，但注意做好风险管理，仓位不宜过重`
+};
+
+let reportGenerated = false;
+
+function openMorningReport() {
+  document.getElementById('modalOverlay').classList.add('show');
+  document.getElementById('modalDate').textContent = new Date().toLocaleDateString('zh-CN') + ' · 开盘分析';
+  if(!reportGenerated) { generateReport(); reportGenerated=true; }
+}
+function closeMorningReport() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+document.getElementById('modalOverlay').addEventListener('click', function(e){
+  if(e.target===this) closeMorningReport();
+});
+
+function generateReport() {
+  // overview typewriter
+  typewriterTo('modalOverview', REPORT.overview.replace(/\n/g,'<br>'), 12);
+  // highlights
+  const hl = document.getElementById('modalHighlights');
+  hl.innerHTML = '';
+  REPORT.highlights.forEach(h=>{
+    const c=h.isUp?'#ff5555':'#00cc80';
+    hl.innerHTML+=`<div class="mh-item">
+      <div class="mh-sector">${h.sector}</div>
+      <div class="mh-chg" style="color:${c}">${h.chg}</div>
+      <div class="mh-reason">${h.reason}</div>
+    </div>`;
+  });
+  setTimeout(()=>typewriterTo('modalRisk', REPORT.risk.replace(/\n/g,'<br>'), 10), 1400);
+  setTimeout(()=>typewriterTo('modalAdvice', REPORT.advice.replace(/\n/g,'<br>'), 10), 2600);
+  document.getElementById('modalGenTime').textContent = '🤖 AI 生成于 ' + new Date().toLocaleTimeString('zh-CN');
+}
+
+function typewriterTo(id, html, speed) {
+  const el = document.getElementById(id);
+  const stripped = html.replace(/<br>/g,'\n');
+  let i=0; el.innerHTML='<span class="ai-cursor"></span>';
+  const t = setInterval(()=>{
+    if(i>=stripped.length){clearInterval(t);el.innerHTML=html;return;}
+    el.innerHTML=stripped.slice(0,i).replace(/\n/g,'<br>')+'<span class="ai-cursor"></span>';
+    i++;
+  }, speed);
+}
+
+// ══════════════════════════════════════════
+// TOOLBAR TABS
+// ══════════════════════════════════════════
+let tbGroups=[],curGroup=[];
+document.querySelectorAll('.toolbar *').forEach(el=>{
+  if(el.classList.contains('tb-sep')){tbGroups.push(curGroup);curGroup=[];}
+  else if(el.classList.contains('tbtn'))curGroup.push(el);
+});
+tbGroups.push(curGroup);
+tbGroups.forEach(g=>{g.forEach(b=>{b.addEventListener('click',()=>{g.forEach(x=>x.classList.remove('on'));b.classList.add('on');});});});
+
+// ══════════════════════════════════════════
+// SEARCH
+// ══════════════════════════════════════════
+const si=document.getElementById('searchInput'), sd=document.getElementById('searchDrop');
+si.addEventListener('input',()=>sd.classList.toggle('show',si.value.length>0));
+si.addEventListener('blur',()=>setTimeout(()=>sd.classList.remove('show'),200));
+
+// ══════════════════════════════════════════
+// CLOCK + FLICKER
+// ══════════════════════════════════════════
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});},1000);
+const blks=document.querySelectorAll('.blk');
+setInterval(()=>{const b=blks[Math.floor(Math.random()*blks.length)];b.style.filter='brightness(1.2)';setTimeout(()=>b.style.filter='',250);},900);
+</script>
+</body>
+</html>
